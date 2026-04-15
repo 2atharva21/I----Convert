@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2024-04-16
+
+### 🎉 Professional Dashboard Release
+
+#### Added
+- ✅ **Page Orientation Options** - Portrait/Landscape selection buttons
+- ✅ **Page Size Selection** - A4 and Letter format dropdowns
+- ✅ **Margin Control** - No margin, Small (10pt), Medium (20pt) options
+- ✅ **Smart Image Scaling** - Aspect ratio preserved with margin support
+- ✅ **Dashboard UI** - Modern iLovePDF-style options interface
+- ✅ **Active State Styling** - Visual feedback for selected options
+- ✅ **Input Validation** - Backend validates all PDF options
+- ✅ **Options Logging** - Analytics tracks selected PDF options
+
+#### Changed
+- 🔄 **PDF Generation Logic** - Complete rewrite to support layout options
+- 🔄 **Page Dimensions** - Dynamic calculation based on orientation and size
+- 🔄 **Image Positioning** - Centered placement with margin support
+- 🔄 **Frontend State** - Added selectedOptions object for option tracking
+- 🔄 **Query Parameters** - Convert endpoint now accepts: orientation, size, margin
+
+#### Technical Details
+- **Page Size Constants:** A4 (595×842pt) and Letter (612×792pt)
+- **Margin Sizes:** 0pt (none), 28pt (small), 57pt (medium)
+- **Image Scaling:** Maintains aspect ratio while fitting content area
+- **CSS Grid Layout:** Responsive button groups for all screen sizes
+
+#### Tested On
+- Node.js 18.x, 20.x
+- Chrome, Firefox, Safari, Edge
+- Windows, macOS, Linux
+- Mobile browsers (iOS Safari, Chrome Mobile)
+
+---
+
 ## [1.0.0] - 2024-04-16
 
 ### 🎉 Initial Release

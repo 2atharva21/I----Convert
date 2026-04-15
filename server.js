@@ -64,22 +64,58 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
-// PDF page size constants (A4)
-const A4_WIDTH = 595;
-const A4_HEIGHT = 842;
+// PDF page size constants (in points: 72 points = 1 inch)
+// A4: 210mm x 297mm
+const PAGE_SIZES = {
+  A4: {
+    portrait: { width: 595, height: 842 },
+    landscape: { width: 842, height: 595 }
+  },
+  Letter: {
+    portrait: { width: 612, height: 792 },
+    landscape: { width: 792, height: 612 }
+  }
+};
+
+// Margin sizes in points (72 points = 1 inch)
+const MARGIN_SIZES = {
+  0: 0,      // No margin
+  10: 28,    // Small (~10pt)
+  20: 57     // Medium (~20pt)
+};
 
 // Convert images to PDF
 app.post('/convert', upload.array('images', 20), async (req, res) => {
   // Set timeout protection (30 seconds for heavy PDF processing)
   req.setTimeout(30000);
   
-  // Check for A4 mode from query parameter
-  const useA4 = req.query.a4 === 'true';
+  // Read PDF options from query parameters
+  const orientation = (req.query.orientation || 'portrait').toLowerCase();
+  const pageSize = (req.query.size || 'A4').toUpperCase();
+  const margin = parseInt(req.query.margin || 0);
+  
   const clientIP = req.ip || req.connection.remoteAddress;
 
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    // Validate options
+    const validOrientations = ['portrait', 'landscape'];
+    const validSizes = Object.keys(PAGE_SIZES);
+    const validMargins = Object.keys(MARGIN_SIZES);
+    
+    if (!validOrientations.includes(orientation)) {
+      return res.status(400).json({ error: `Invalid orientation. Must be: ${validOrientations.join(', ')}` });
+    }
+    
+    if (!validSizes.includes(pageSize)) {
+      return res.status(400).json({ error: `Invalid page size. Must be: ${validSizes.join(', ')}` });
+    }
+    
+    if (!validMargins.includes(String(margin))) {
+      return res.status(400).json({ error: `Invalid margin. Must be: ${validMargins.join(', ')}` });
     }
 
     // Check total upload size limit (50MB max)
@@ -89,6 +125,12 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     if (totalSize > maxTotalSize) {
       throw new Error(`Total file size (${(totalSize / 1024 / 1024).toFixed(2)}MB) exceeds 50MB limit`);
     }
+
+    // Get page dimensions based on options
+    const pageDimensions = PAGE_SIZES[pageSize][orientation];
+    const marginPoints = MARGIN_SIZES[margin];
+    const contentWidth = pageDimensions.width - (marginPoints * 2);
+    const contentHeight = pageDimensions.height - (marginPoints * 2);
 
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
@@ -125,32 +167,34 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
         // Embed image in PDF
         const image = await pdfDoc.embedJpg(imageData);
         
-        // Create page: use A4 size or original image dimensions
-        let page;
-        if (useA4) {
-          page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
-          // Scale and center image to fit A4
-          const scaledImage = image.scaleToFit(A4_WIDTH - 40, A4_HEIGHT - 40);
-          page.drawImage(image, {
-            x: (A4_WIDTH - scaledImage.width) / 2,
-            y: (A4_HEIGHT - scaledImage.height) / 2,
-            width: scaledImage.width,
-            height: scaledImage.height
-          });
-        } else {
-          // Use original image dimensions
-          page = pdfDoc.addPage([image.width, image.height]);
-          page.drawImage(image, {
-            x: 0,
-            y: 0,
-            width: image.width,
-            height: image.height
-          });
+        // Create page with specified size
+        const page = pdfDoc.addPage([pageDimensions.width, pageDimensions.height]);
+        
+        // Calculate scaled image dimensions to fit content area
+        let scaledWidth = image.width;
+        let scaledHeight = image.height;
+        
+        // Scale image to fit within content area (preserving aspect ratio)
+        if (scaledWidth > contentWidth || scaledHeight > contentHeight) {
+          const scale = Math.min(contentWidth / scaledWidth, contentHeight / scaledHeight);
+          scaledWidth *= scale;
+          scaledHeight *= scale;
         }
         
-        // Log rotation info
-        if (rotation !== 0) {
-          console.log(`Image ${fileIndex + 1} rotated: ${rotation}°`);
+        // Calculate position to center image within content area
+        const posX = marginPoints + (contentWidth - scaledWidth) / 2;
+        const posY = marginPoints + (contentHeight - scaledHeight) / 2;
+        
+        // Draw image with margins and centering
+        page.drawImage(image, {
+          x: posX,
+          y: posY,
+          width: scaledWidth,
+          height: scaledHeight
+        });
+        
+        // Log conversion info
+        console.log(`Image ${fileIndex + 1}: rotated ${rotation}°, scaled to ${scaledWidth.toFixed(0)}×${scaledHeight.toFixed(0)}pt, positioned at (${posX.toFixed(0)}, ${posY.toFixed(0)}pt)`);
         }
         
         processedCount++;
@@ -191,8 +235,8 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     // Safely encode filename for HTTP header (RFC 5987)
     const safeFileName = encodeURIComponent(outputFileName);
 
-    // Analytics: Log successful conversion with output filename
-    console.log(`[SUCCESS] Processed ${processedCount} image(s) in ${useA4 ? 'A4' : 'original'} mode | Output: ${outputFileName} | IP: ${clientIP} | Total size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+    // Analytics: Log successful conversion with output filename and options
+    console.log(`[SUCCESS] Processed ${processedCount} image(s) | Options: ${orientation} ${pageSize} margin=${margin}pt | Output: ${outputFileName} | IP: ${clientIP} | Total size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
 
     // Send PDF as response with security headers
     res.setHeader('Content-Type', 'application/pdf');

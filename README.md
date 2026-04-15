@@ -22,6 +22,12 @@ Convert your JPG images into a single PDF file with powerful editing features li
 - ✅ **Remove Images** - Delete unwanted images from preview
 - ✅ **Real-time Updates** - All changes reflected instantly
 
+### 📋 PDF Customization (NEW!)
+- ✅ **Page Orientation** - Choose Portrait or Landscape mode
+- ✅ **Page Size Selection** - A4 or Letter formats
+- ✅ **Margin Control** - No margin, Small, or Medium options
+- ✅ **Smart Scaling** - Images automatically fit with margins applied
+
 ### 📥 Download Features
 - ✅ **Smart Filenames** - Downloads use original filename (e.g., `photo.jpg` → `photo.pdf`)
 - ✅ **Merged Naming** - Multiple files get `-merged` suffix (e.g., `photo-merged.pdf`)
@@ -133,15 +139,21 @@ http://localhost:3000
    - Click **×** to remove unwanted images
    - Changes are reflected instantly
 
-3. **Convert to PDF**
+3. **Configure PDF** (NEW!)
+   - **Page Orientation** - Select Portrait (default) or Landscape
+   - **Page Size** - Choose A4 (default) or Letter
+   - **Margin** - Pick No Margin (default), Small, or Medium
+   - Options preview in real-time
+
+4. **Convert to PDF**
    - Click "Convert to PDF" button
    - Wait for conversion (see loading spinner)
    - View generated filename before download
 
-4. **Download**
+5. **Download**
    - Click "📥 Download PDF" button
    - File saves with original filename (e.g., `vacation.pdf`)
-   - Open and verify rotations are applied
+   - Open and verify rotations and formatting are applied
 
 ### Advanced Usage
 

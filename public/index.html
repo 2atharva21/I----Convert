@@ -48,9 +48,57 @@
             <!-- Success Message -->
             <div id="successMessage" class="success-message" style="display: none;"></div>
 
+            <!-- PDF Options Section -->
+            <div id="optionsSection" class="options-section" style="display: none;">
+                <h3 class="options-title">📋 Image to PDF Options</h3>
+
+                <!-- Page Orientation -->
+                <div class="option-group">
+                    <label class="option-label">📐 Page Orientation</label>
+                    <div class="button-group">
+                        <button class="option-btn orientation-btn active" data-value="portrait">
+                            <span class="btn-icon">⬆️</span>
+                            Portrait
+                        </button>
+                        <button class="option-btn orientation-btn" data-value="landscape">
+                            <span class="btn-icon">⬅️</span>
+                            Landscape
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Page Size -->
+                <div class="option-group">
+                    <label class="option-label">📄 Page Size</label>
+                    <select id="pageSizeSelect" class="page-size-select">
+                        <option value="A4" selected>A4 (297 × 210 mm)</option>
+                        <option value="Letter">Letter (8.5 × 11 in)</option>
+                    </select>
+                </div>
+
+                <!-- Margin -->
+                <div class="option-group">
+                    <label class="option-label">📏 Margin</label>
+                    <div class="button-group">
+                        <button class="option-btn margin-btn active" data-value="0">
+                            <span class="btn-icon">⊡</span>
+                            No Margin
+                        </button>
+                        <button class="option-btn margin-btn" data-value="10">
+                            <span class="btn-icon">⊞</span>
+                            Small
+                        </button>
+                        <button class="option-btn margin-btn" data-value="20">
+                            <span class="btn-icon">⊟</span>
+                            Medium
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Convert and Download Section -->
             <div id="actionSection" class="action-section" style="display: none;">
-                <button id="convertBtn" class="btn btn-success" disabled>Convert to PDF</button>
+                <button id="convertBtn" class="btn btn-success" disabled>🔄 Convert to PDF</button>
                 <div id="loadingSpinner" class="spinner" style="display: none;"></div>
                 <p id="loadingText" class="loading-text" style="display: none;">Converting your images...</p>
             </div>

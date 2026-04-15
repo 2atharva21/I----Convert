@@ -330,6 +330,114 @@ body {
     margin-bottom: 20px;
 }
 
+/* Options Section (Dashboard) */
+.options-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    animation: slideIn 0.3s ease;
+}
+
+.options-title {
+    font-size: 1.15em;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.option-group {
+    margin-bottom: 20px;
+}
+
+.option-group:last-child {
+    margin-bottom: 0;
+}
+
+.option-label {
+    display: block;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+/* Button Group */
+.button-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+}
+
+.option-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    background: white;
+    border-radius: 8px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.option-btn:hover:not(.active) {
+    border-color: var(--secondary-color);
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.05), rgba(78, 205, 196, 0.02));
+    transform: translateY(-2px);
+}
+
+.option-btn.active {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05));
+    color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+}
+
+.btn-icon {
+    font-size: 1.2em;
+}
+
+/* Page Size Dropdown */
+.page-size-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: white;
+    font-size: 0.95em;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.page-size-select:hover {
+    border-color: var(--secondary-color);
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.03), rgba(78, 205, 196, 0.01));
+}
+
+.page-size-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+}
+
+.page-size-select option {
+    padding: 10px;
+    background: white;
+    color: var(--text-primary);
+}
+
 /* Action Section */
 .action-section {
     position: relative;

@@ -3,6 +3,7 @@ const fileInput = document.getElementById('fileInput');
 const dragDropArea = document.getElementById('dragDropArea');
 const previewSection = document.getElementById('previewSection');
 const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+const optionsSection = document.getElementById('optionsSection');
 const actionSection = document.getElementById('actionSection');
 const downloadSection = document.getElementById('downloadSection');
 const errorMessage = document.getElementById('errorMessage');
@@ -18,6 +19,13 @@ const loadingText = document.getElementById('loadingText');
 let selectedFiles = [];
 let rotations = []; // Track rotation for each image (in degrees)
 let isFilePickerOpen = false;
+
+// PDF Options State
+let selectedOptions = {
+    orientation: 'portrait',
+    size: 'A4',
+    margin: 0
+};
 
 // Event Listeners
 fileInput.addEventListener('change', handleFileSelect);
@@ -44,6 +52,33 @@ dragDropArea.addEventListener('drop', handleFileDrop);
 convertBtn.addEventListener('click', convertToPDF);
 clearImagesBtn.addEventListener('click', clearAllImages);
 convertAnotherBtn.addEventListener('click', resetForm);
+
+// PDF Options Event Listeners
+// Orientation buttons
+document.querySelectorAll('.orientation-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.orientation-btn').forEach(b => b.classList.remove('active'));
+        e.target.closest('button').classList.add('active');
+        selectedOptions.orientation = e.target.closest('button').dataset.value;
+    });
+});
+
+// Page size dropdown
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+    pageSizeSelect.addEventListener('change', (e) => {
+        selectedOptions.size = e.target.value;
+    });
+}
+
+// Margin buttons
+document.querySelectorAll('.margin-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.margin-btn').forEach(b => b.classList.remove('active'));
+        e.target.closest('button').classList.add('active');
+        selectedOptions.margin = parseInt(e.target.closest('button').dataset.value);
+    });
+});
 
 // Handle file selection from input (single file at a time)
 function handleFileSelect(e) {
@@ -226,9 +261,11 @@ function clearAllImages() {
 // Update action buttons visibility
 function updateActionButtons() {
     if (selectedFiles.length > 0) {
+        optionsSection.style.display = 'block';
         actionSection.style.display = 'block';
         convertBtn.disabled = false;
     } else {
+        optionsSection.style.display = 'none';
         actionSection.style.display = 'none';
         downloadSection.style.display = 'none';
         convertBtn.disabled = true;
@@ -256,8 +293,15 @@ async function convertToPDF() {
             formData.append(`rotation_${index}`, rotations[index] || 0);
         });
 
-        // Send to backend
-        const response = await fetch('/convert', {
+        // Build query string with PDF options
+        const queryParams = new URLSearchParams({
+            orientation: selectedOptions.orientation,
+            size: selectedOptions.size,
+            margin: selectedOptions.margin
+        });
+
+        // Send to backend with query parameters
+        const response = await fetch(`/convert?${queryParams.toString()}`, {
             method: 'POST',
             body: formData
         });
