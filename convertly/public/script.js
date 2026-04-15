@@ -16,21 +16,48 @@ const loadingText = document.getElementById('loadingText');
 
 // File storage
 let selectedFiles = [];
+let isFilePickerOpen = false;
 
 // Event Listeners
 fileInput.addEventListener('change', handleFileSelect);
-dragDropArea.addEventListener('click', () => fileInput.click());
+
+// Handle label click for file selection
+const fileLabel = document.querySelector('label[for="fileInput"]');
+if (fileLabel) {
+    fileLabel.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isFilePickerOpen) {
+            isFilePickerOpen = true;
+            fileInput.click();
+        }
+    });
+}
+
+// Handle drag & drop area
 dragDropArea.addEventListener('dragover', handleDragOver);
 dragDropArea.addEventListener('dragleave', handleDragLeave);
 dragDropArea.addEventListener('drop', handleFileDrop);
+
+// Convert and other buttons
 convertBtn.addEventListener('click', convertToPDF);
 clearImagesBtn.addEventListener('click', clearAllImages);
 convertAnotherBtn.addEventListener('click', resetForm);
 
-// Handle file selection from input
+// Handle file selection from input (single file at a time)
 function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
-    addFiles(files);
+    isFilePickerOpen = false; // Reset flag
+    
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    // Only take the first file (enforce single selection)
+    const file = files[0];
+    
+    addFiles([file]);
+    
+    // Reset input so same file can be selected again
+    fileInput.value = '';
 }
 
 // Handle drag over
@@ -226,8 +253,8 @@ async function convertToPDF() {
         // Create download link
         const url = URL.createObjectURL(blob);
         downloadLink.href = url;
-        // Let backend control the filename through Content-Disposition header
-        // Frontend only displays it for UX
+        // Set the download filename attribute (ensures browser saves with correct name)
+        downloadLink.download = outputFileName;
 
         // Display filename to user
         const fileNameDisplay = document.getElementById('fileNameDisplay');
