@@ -195,7 +195,6 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
         
         // Log conversion info
         console.log(`Image ${fileIndex + 1}: rotated ${rotation}°, scaled to ${scaledWidth.toFixed(0)}×${scaledHeight.toFixed(0)}pt, positioned at (${posX.toFixed(0)}, ${posY.toFixed(0)}pt)`);
-        }
         
         processedCount++;
       } catch (error) {
