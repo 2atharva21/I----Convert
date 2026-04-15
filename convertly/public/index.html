@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertly - JPG to PDF Converter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <!-- Header -->
+            <div class="header">
+                <h1 class="title">Convertly</h1>
+                <p class="subtitle">Convert your JPG images to PDF</p>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="upload-section">
+                <div class="drag-drop-area" id="dragDropArea">
+                    <div class="upload-icon">📤</div>
+                    <h2>Drag & drop your JPG files here</h2>
+                    <p>or</p>
+                    <label for="fileInput" class="btn btn-primary">Select JPG Files</label>
+                    <input 
+                        type="file" 
+                        id="fileInput" 
+                        multiple 
+                        accept=".jpg,.jpeg,image/jpeg,image/jpg"
+                        style="display: none;"
+                    >
+                    <p class="file-info">Maximum 10MB per file</p>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div id="previewSection" class="preview-section" style="display: none;">
+                <h3>Selected Images</h3>
+                <div id="imagePreviewContainer" class="image-preview-container">
+                    <!-- Previews will be inserted here -->
+                </div>
+                <button id="clearImagesBtn" class="btn btn-secondary">Clear All</button>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+
+            <!-- Convert and Download Section -->
+            <div id="actionSection" class="action-section" style="display: none;">
+                <button id="convertBtn" class="btn btn-success" disabled>Convert to PDF</button>
+                <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+                <p id="loadingText" class="loading-text" style="display: none;">Converting your images...</p>
+            </div>
+
+            <!-- Download Section -->
+            <div id="downloadSection" class="download-section" style="display: none;">
+                <p class="success-text">✓ PDF created successfully!</p>
+                <p id="fileNameDisplay" class="file-name-display"></p>
+                <a id="downloadLink" href="#" class="btn btn-download" download="converted.pdf">
+                    📥 Download PDF
+                </a>
+                <button id="convertAnotherBtn" class="btn btn-secondary">Convert Another</button>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p>© 2024 Convertly. Convert JPG to PDF in seconds.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
