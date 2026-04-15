@@ -115,6 +115,11 @@ function updatePreview() {
     }
 
     previewSection.style.display = 'block';
+    
+    // Update file count display
+    const fileCountDisplay = document.getElementById('fileCount');
+    fileCountDisplay.textContent = `📊 ${selectedFiles.length} file(s) selected`;
+    
     imagePreviewContainer.innerHTML = '';
 
     selectedFiles.forEach((file, index) => {
@@ -203,27 +208,26 @@ async function convertToPDF() {
         // Get PDF blob
         const blob = await response.blob();
 
-        // Generate smart filename based on uploaded files
+        // Extract filename from backend response header (backend is source of truth)
         let outputFileName = 'converted.pdf';
         try {
-            const firstFile = selectedFiles[0];
-            if (firstFile && firstFile.name) {
-                // Extract base name without extension
-                const baseName = firstFile.name.split('.').slice(0, -1).join('.');
-                if (baseName && baseName.trim()) {
-                    outputFileName = selectedFiles.length > 1
-                        ? `${baseName}-merged.pdf`
-                        : `${baseName}.pdf`;
+            const contentDisposition = response.headers.get('Content-Disposition');
+            if (contentDisposition) {
+                // Extract filename from "attachment; filename*=UTF-8''..." format
+                const match = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+                if (match && match[1]) {
+                    outputFileName = decodeURIComponent(match[1]);
                 }
             }
         } catch (err) {
-            console.warn('Could not parse filename, using fallback:', err);
+            console.warn('Could not extract filename from header:', err);
         }
 
         // Create download link
         const url = URL.createObjectURL(blob);
         downloadLink.href = url;
-        downloadLink.download = outputFileName;
+        // Let backend control the filename through Content-Disposition header
+        // Frontend only displays it for UX
 
         // Display filename to user
         const fileNameDisplay = document.getElementById('fileNameDisplay');
