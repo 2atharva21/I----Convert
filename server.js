@@ -101,6 +101,11 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
+    // Validate file count limit
+    if (req.files.length > 20) {
+      return res.status(400).json({ error: 'Maximum 20 images allowed per conversion' });
+    }
+
     // Validate options
     const validOrientations = ['portrait', 'landscape'];
     const validSizes = Object.keys(PAGE_SIZES);
@@ -123,7 +128,7 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     const maxTotalSize = 100 * 1024 * 1024; // 100MB
     
     if (totalSize > maxTotalSize) {
-      throw new Error(`Total file size (${(totalSize / 1024 / 1024).toFixed(2)}MB) exceeds 50MB limit`);
+      throw new Error(`Total file size (${(totalSize / 1024 / 1024).toFixed(2)}MB) exceeds 100MB limit`);
     }
 
     // Get page dimensions based on options
@@ -131,57 +136,79 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     const marginPoints = MARGIN_SIZES[margin];
     const contentWidth = pageDimensions.width - (marginPoints * 2);
     const contentHeight = pageDimensions.height - (marginPoints * 2);
+    
+    // Get quality from query params (default 80 for optimal compression)
+    const quality = Math.min(Math.max(parseInt(req.query.quality) || 80, 60), 95); // Clamp: 60-95
 
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
-    let processedCount = 0;
-
-    // Add each image to the PDF
-    for (let fileIndex = 0; fileIndex < req.files.length; fileIndex++) {
-      const file = req.files[fileIndex];
-      try {
-        // Read image file asynchronously (non-blocking)
-        let imageData = await fs.promises.readFile(file.path);
-        
-        // SECURITY: Verify actual file content (not just extension)
-        const fileType = await fileTypeFromBuffer(imageData);
-        if (!fileType || !fileType.mime.startsWith('image/jpeg')) {
-          throw new Error(`"${file.originalname}" is corrupted or not a valid JPEG image`);
-        }
-        
-        // Get rotation value from request (in degrees: 0, 90, 180, 270, etc.)
-        const rotation = parseInt(req.body[`rotation_${fileIndex}`]) || 0;
-        
-        // Get quality from query params (default 80 for optimal compression)
-        const quality = Math.min(Math.max(parseInt(req.query.quality) || 80, 60), 95); // Clamp: 60-95
-        
-        // Process image: rotate, resize, and compress
-        // This handles large phone photos (4000x3000, 5MB-25MB) efficiently
-        let sharpPipeline = sharp(imageData);
-        
-        // Apply rotation if needed
-        if (rotation !== 0) {
-          const normalizedRotation = ((rotation % 360) + 360) % 360;
-          if (normalizedRotation !== 0) {
-            sharpPipeline = sharpPipeline.rotate(normalizedRotation);
+    
+    // Process all images in parallel for better performance
+    const processedImages = await Promise.all(
+      req.files.map(async (file, fileIndex) => {
+        try {
+          // Read image file asynchronously (non-blocking)
+          let imageData = await fs.promises.readFile(file.path);
+          
+          // SECURITY: Verify actual file content (not just extension)
+          const fileType = await fileTypeFromBuffer(imageData);
+          if (!fileType || !fileType.mime.startsWith('image/jpeg')) {
+            throw new Error(`"${file.originalname}" is corrupted or not a valid JPEG image`);
           }
+          
+          // Get rotation value from request (in degrees: 0, 90, 180, 270, etc.)
+          const rotation = parseInt(req.body[`rotation_${fileIndex}`]) || 0;
+          
+          // Process image: rotate, resize, and compress
+          // This handles large phone photos (4000x3000, 5MB-25MB) efficiently
+          let sharpPipeline = sharp(imageData);
+          
+          // Apply rotation if needed
+          if (rotation !== 0) {
+            const normalizedRotation = ((rotation % 360) + 360) % 360;
+            if (normalizedRotation !== 0) {
+              sharpPipeline = sharpPipeline.rotate(normalizedRotation);
+            }
+          }
+          
+          // Resize large images (max 1920px width) and compress intelligently
+          const processedImageData = await sharpPipeline
+            .resize({
+              width: 1920,        // Limit max width to 1920px
+              withoutEnlargement: true // Don't upscale small images
+            })
+            .jpeg({
+              quality: quality,   // User-controlled quality (60-95)
+              mozjpeg: true,      // Use MozJPEG for better compression
+              progressive: true   // Progressive JPEG for faster loading
+            })
+            .toBuffer();
+          
+          // Return processed image data with metadata
+          return {
+            data: processedImageData,
+            originalSize: imageData.length,
+            processedSize: processedImageData.length,
+            filename: file.originalname,
+            index: fileIndex,
+            rotation: rotation
+          };
+        } catch (error) {
+          console.error(`Error processing file ${file.originalname}:`, error);
+          throw error;
         }
-        
-        // Resize large images (max 1920px width) and compress intelligently
-        imageData = await sharpPipeline
-          .resize({
-            width: 1920,        // Limit max width to 1920px
-            withoutEnlargement: true // Don't upscale small images
-          })
-          .jpeg({
-            quality: quality,   // User-controlled quality (60-95)
-            mozjpeg: true,      // Use MozJPEG for better compression
-            progressive: true   // Progressive JPEG for faster loading
-          })
-          .toBuffer();
-        
+      })
+    );
+    
+    let processedCount = 0;
+    const totalOriginalSize = processedImages.reduce((sum, img) => sum + img.originalSize, 0);
+    const totalProcessedSize = processedImages.reduce((sum, img) => sum + img.processedSize, 0);
+    
+    // Add each processed image to the PDF
+    for (const processedImage of processedImages) {
+      try {
         // Embed image in PDF
-        const image = await pdfDoc.embedJpg(imageData);
+        const image = await pdfDoc.embedJpg(processedImage.data);
         
         // Create page with specified size
         const page = pdfDoc.addPage([pageDimensions.width, pageDimensions.height]);
@@ -209,12 +236,13 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
           height: scaledHeight
         });
         
-        // Log conversion info
-        console.log(`Image ${fileIndex + 1}: rotated ${rotation}°, scaled to ${scaledWidth.toFixed(0)}×${scaledHeight.toFixed(0)}pt, positioned at (${posX.toFixed(0)}, ${posY.toFixed(0)}pt)`);
+        // Log conversion info with compression stats
+        const compressionRatio = ((1 - processedImage.processedSize / processedImage.originalSize) * 100).toFixed(1);
+        console.log(`Image ${processedImage.index + 1}: ${processedImage.filename} | rotated ${processedImage.rotation}° | scaled to ${scaledWidth.toFixed(0)}×${scaledHeight.toFixed(0)}pt | compression: ${compressionRatio}%`);
         
         processedCount++;
       } catch (error) {
-        console.error(`Error processing file ${file.originalname}:`, error);
+        console.error(`Error embedding image ${processedImage.filename}:`, error);
         throw error;
       }
     }
@@ -249,9 +277,12 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     
     // Safely encode filename for HTTP header (RFC 5987)
     const safeFileName = encodeURIComponent(outputFileName);
+    
+    // Calculate compression stats
+    const compressionPercentage = ((1 - totalProcessedSize / totalOriginalSize) * 100).toFixed(1);
 
     // Analytics: Log successful conversion with output filename and options
-    console.log(`[SUCCESS] Processed ${processedCount} image(s) | Options: ${orientation} ${pageSize} margin=${margin}pt | Output: ${outputFileName} | IP: ${clientIP} | Total size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`[SUCCESS] Processed ${processedCount} image(s) | Quality: ${quality} | Compression: ${compressionPercentage}% (${(totalOriginalSize / 1024 / 1024).toFixed(2)}MB → ${(totalProcessedSize / 1024 / 1024).toFixed(2)}MB) | Options: ${orientation} ${pageSize} margin=${margin}pt | Output: ${outputFileName} | IP: ${clientIP}`);
 
     // Send PDF as response with security headers
     res.setHeader('Content-Type', 'application/pdf');
@@ -259,6 +290,9 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
     res.setHeader('Cache-Control', 'no-store'); // Don't cache sensitive files
     res.setHeader('X-Content-Type-Options', 'nosniff'); // Prevent MIME sniffing
     res.setHeader('X-Frame-Options', 'DENY'); // Prevent clickjacking
+    // Custom headers for compression stats
+    res.setHeader('X-Original-Size', totalOriginalSize.toString());
+    res.setHeader('X-Processed-Size', totalProcessedSize.toString());
     res.send(Buffer.from(pdfBytes));
 
   } catch (error) {
@@ -293,7 +327,7 @@ app.use((err, req, res, next) => {
   
   if (err instanceof multer.MulterError) {
     if (err.code === 'FILE_TOO_LARGE') {
-      return res.status(413).json({ error: 'File size exceeds 10MB limit' });
+      return res.status(413).json({ error: 'File size exceeds 25MB limit' });
     }
     return res.status(400).json({ error: 'Upload error: ' + err.message });
   }

@@ -60,6 +60,21 @@ convertBtn.addEventListener('click', convertToPDF);
 clearImagesBtn.addEventListener('click', clearAllImages);
 convertAnotherBtn.addEventListener('click', resetForm);
 
+// Start over button (NEW)
+const clearAllAfterDownloadBtn = document.getElementById('clearAllAfterDownloadBtn');
+if (clearAllAfterDownloadBtn) {
+    clearAllAfterDownloadBtn.addEventListener('click', () => {
+        selectedFiles = [];
+        rotations = [];
+        fileInput.value = '';
+        updatePreview();
+        updateActionButtons();
+        downloadSection.style.display = 'none';
+        hideMessages();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     // Escape to hide error/success messages
@@ -184,20 +199,28 @@ function addFiles(files) {
             return;
         }
 
-        // Track large files for warning
-        if (file.size > 15 * 1024 * 1024) {
-            largeFiles.push(file);
-        }
-
         validFiles.push(file);
     });
 
     if (validFiles.length > 0) {
+        // Check if adding these files would exceed the 20 image limit
+        if (selectedFiles.length + validFiles.length > 20) {
+            showError(`⚠️ You can select a maximum of 20 images. Currently: ${selectedFiles.length}, trying to add: ${validFiles.length}`);
+            return;
+        }
+        
         selectedFiles = [...selectedFiles, ...validFiles];
         // Initialize rotation for new files
         validFiles.forEach(() => rotations.push(0));
         updatePreview();
         updateActionButtons();
+        
+        // Track large files for warning
+        validFiles.forEach(file => {
+            if (file.size > 15 * 1024 * 1024) {
+                largeFiles.push(file);
+            }
+        });
         
         // Show warning for large images
         if (largeFiles.length > 0) {
@@ -231,9 +254,11 @@ function updatePreview() {
 
     previewSection.style.display = 'block';
     
-    // Update file count display
+    // Update file count display with limit indicator
     const fileCountDisplay = document.getElementById('fileCount');
-    fileCountDisplay.textContent = `📊 ${selectedFiles.length} file(s) selected`;
+    const countStr = `📊 ${selectedFiles.length} file(s) selected`;
+    const limitStr = selectedFiles.length >= 20 ? ' (MAX REACHED)' : '';
+    fileCountDisplay.textContent = countStr + limitStr;
     
     imagePreviewContainer.innerHTML = '';
 
@@ -395,6 +420,9 @@ async function convertToPDF() {
 
         // Extract filename from backend response header (backend is source of truth)
         let outputFileName = 'converted.pdf';
+        let originalSize = 0;
+        let processedSize = 0;
+        
         try {
             const contentDisposition = response.headers.get('Content-Disposition');
             if (contentDisposition) {
@@ -404,8 +432,12 @@ async function convertToPDF() {
                     outputFileName = decodeURIComponent(match[1]);
                 }
             }
+            
+            // Get compression stats from custom headers
+            originalSize = parseInt(response.headers.get('X-Original-Size') || '0');
+            processedSize = parseInt(response.headers.get('X-Processed-Size') || '0');
         } catch (err) {
-            console.warn('Could not extract filename from header:', err);
+            console.warn('Could not extract headers:', err);
         }
 
         // Create download link
@@ -416,7 +448,12 @@ async function convertToPDF() {
 
         // Display filename to user
         const fileNameDisplay = document.getElementById('fileNameDisplay');
-        fileNameDisplay.innerHTML = `📄 <strong>File name:</strong> ${escapeHtml(outputFileName)}`;
+        let sizeInfo = '';
+        if (originalSize > 0 && processedSize > 0) {
+            const reduction = ((1 - processedSize / originalSize) * 100).toFixed(1);
+            sizeInfo = `<br><span style="font-size: 0.9em; color: var(--text-secondary);">📦 ${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(processedSize / 1024 / 1024).toFixed(1)}MB (${reduction}% reduction)</span>`;
+        }
+        fileNameDisplay.innerHTML = `📄 <strong>File name:</strong> ${escapeHtml(outputFileName)}${sizeInfo}`;
 
         // Show download section
         downloadSection.style.display = 'block';
@@ -426,7 +463,7 @@ async function convertToPDF() {
         actionSection.style.display = 'none';
         
         // Log success for debugging
-        console.log(`[SUCCESS] Converted ${selectedFiles.length} file(s) - ${outputFileName}`);
+        console.log(`[SUCCESS] Converted ${selectedFiles.length} file(s) - ${outputFileName} | Compression: ${originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : 'N/A'}%`);
 
     } catch (error) {
         console.error('Conversion error:', error);
@@ -441,17 +478,15 @@ async function convertToPDF() {
 
 // Reset form
 function resetForm() {
-    selectedFiles = [];
-    rotations = [];
+    // Option 1: Keep files for re-conversion (better UX)
+    // Clear only the download section and show options again
     fileInput.value = '';
-    updatePreview();
-    updateActionButtons();
     downloadSection.style.display = 'none';
-    actionSection.style.display = 'none';
+    actionSection.style.display = 'block';
     hideMessages();
     
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to options
+    optionsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 // Show error message
