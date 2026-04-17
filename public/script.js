@@ -307,8 +307,23 @@ async function convertToPDF() {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Conversion failed');
+            let errorMessage = 'Conversion failed';
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    const text = await response.text();
+                    errorMessage = text.substring(0, 100) || errorMessage;
+                }
+            } else {
+                const text = await response.text();
+                errorMessage = text.substring(0, 100) || errorMessage;
+            }
+            
+            throw new Error(errorMessage);
         }
 
         // Get PDF blob
