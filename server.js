@@ -9,7 +9,7 @@ const { fileTypeFromBuffer } = require('file-type');
 const sharp = require('sharp');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Rate limiting middleware (stricter for heavy processing)
 const limiter = rateLimit({
