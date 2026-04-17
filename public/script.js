@@ -15,11 +15,24 @@ const downloadLink = document.getElementById('downloadLink');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const loadingText = document.getElementById('loadingText');
 
+// Verify all DOM elements exist
+if (!fileInput || !dragDropArea || !previewSection || !imagePreviewContainer || !optionsSection || !actionSection || !downloadSection) {
+    console.error('Missing critical DOM elements!', {
+        fileInput: !!fileInput,
+        dragDropArea: !!dragDropArea,
+        previewSection: !!previewSection,
+        imagePreviewContainer: !!imagePreviewContainer,
+        optionsSection: !!optionsSection,
+        actionSection: !!actionSection,
+        downloadSection: !!downloadSection
+    });
+}
+
 // File storage and rotation tracking
 let selectedFiles = [];
 let rotations = []; // Track rotation for each image (in degrees)
-let isFilePickerOpen = false;
 let isConverting = false;
+let sortable = null; // SortableJS instance
 
 // PDF Options State
 let selectedOptions = {
@@ -43,10 +56,7 @@ if (fileLabel) {
     fileLabel.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!isFilePickerOpen) {
-            isFilePickerOpen = true;
-            fileInput.click();
-        }
+        fileInput.click();
     });
 }
 
@@ -129,8 +139,6 @@ document.querySelectorAll('.quality-btn').forEach(btn => {
 
 // Handle file selection from input (single file at a time)
 function handleFileSelect(e) {
-    isFilePickerOpen = false; // Reset flag
-    
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
@@ -263,45 +271,96 @@ function updatePreview() {
     imagePreviewContainer.innerHTML = '';
 
     selectedFiles.forEach((file, index) => {
-        const reader = new FileReader();
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'image-preview';
+        previewDiv.draggable = true; // Enable drag
         
-        reader.onload = (e) => {
-            const previewDiv = document.createElement('div');
-            previewDiv.className = 'image-preview';
-            
-            const rotationDegrees = rotations[index] || 0;
-            
-            previewDiv.innerHTML = `
-                <img src="${e.target.result}" alt="Image ${index + 1}" class="preview-img" style="transform: rotate(${rotationDegrees}deg)">
-                <div class="index">${index + 1}</div>
-                <div class="controls">
-                    <button class="rotate-left" data-index="${index}" title="Rotate Left">⟲</button>
-                    <button class="rotate-right" data-index="${index}" title="Rotate Right">⟳</button>
-                    <button class="remove-btn" data-index="${index}" title="Remove image">×</button>
-                </div>
-            `;
-            
-            // Add event listeners
-            previewDiv.querySelector('.rotate-left').addEventListener('click', (e) => {
-                e.stopPropagation();
-                rotateImage(index, 'left');
-            });
-            
-            previewDiv.querySelector('.rotate-right').addEventListener('click', (e) => {
-                e.stopPropagation();
-                rotateImage(index, 'right');
-            });
-            
-            previewDiv.querySelector('.remove-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeImage(index);
-            });
-            
-            imagePreviewContainer.appendChild(previewDiv);
-        };
+        const rotationDegrees = rotations[index] || 0;
         
-        reader.readAsDataURL(file);
+        // Create image element with proper loading
+        const img = document.createElement('img');
+        img.className = 'preview-img';
+        img.alt = `Image ${index + 1}`;
+        img.style.transform = `rotate(${rotationDegrees}deg)`;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.style.display = 'block';
+        
+        // Create blob URL for the image
+        const url = URL.createObjectURL(file);
+        img.src = url;
+        
+        // Create controls
+        const indexDiv = document.createElement('div');
+        indexDiv.className = 'index';
+        indexDiv.textContent = index + 1;
+        
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+        
+        const rotateLeftBtn = document.createElement('button');
+        rotateLeftBtn.className = 'rotate-left';
+        rotateLeftBtn.dataset.index = index;
+        rotateLeftBtn.title = 'Rotate Left';
+        rotateLeftBtn.textContent = '⟲';
+        rotateLeftBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateImage(index, 'left');
+        });
+        
+        const rotateRightBtn = document.createElement('button');
+        rotateRightBtn.className = 'rotate-right';
+        rotateRightBtn.dataset.index = index;
+        rotateRightBtn.title = 'Rotate Right';
+        rotateRightBtn.textContent = '⟳';
+        rotateRightBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateImage(index, 'right');
+        });
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.dataset.index = index;
+        removeBtn.title = 'Remove image';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeImage(index);
+        });
+        
+        controls.appendChild(rotateLeftBtn);
+        controls.appendChild(rotateRightBtn);
+        controls.appendChild(removeBtn);
+        
+        previewDiv.appendChild(img);
+        previewDiv.appendChild(indexDiv);
+        previewDiv.appendChild(controls);
+        imagePreviewContainer.appendChild(previewDiv);
     });
+    
+    // Initialize or reinitialize SortableJS for drag & reorder (NEW!)
+    if (typeof Sortable !== 'undefined') {
+        if (sortable) {
+            sortable.destroy();
+        }
+        sortable = new Sortable(imagePreviewContainer, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: (evt) => {
+                // Reorder selectedFiles
+                const movedFile = selectedFiles.splice(evt.oldIndex, 1)[0];
+                selectedFiles.splice(evt.newIndex, 0, movedFile);
+                
+                // Reorder rotations to match
+                const movedRotation = rotations.splice(evt.oldIndex, 1)[0];
+                rotations.splice(evt.newIndex, 0, movedRotation);
+                
+                // Refresh preview
+                updatePreview();
+            }
+        });
+    }
 }
 
 // Rotate image left or right
@@ -336,11 +395,13 @@ function clearAllImages() {
 // Update action buttons visibility
 function updateActionButtons() {
     if (selectedFiles.length > 0) {
+        console.log('Showing options and action sections. Files:', selectedFiles.length);
         optionsSection.style.display = 'block';
         actionSection.style.display = 'block';
         convertBtn.disabled = false;
         updateOptionsSummary(); // Update summary when showing options
     } else {
+        console.log('Hiding options and action sections');
         optionsSection.style.display = 'none';
         actionSection.style.display = 'none';
         downloadSection.style.display = 'none';
@@ -348,7 +409,7 @@ function updateActionButtons() {
     }
 }
 
-// Convert images to PDF
+// Convert images to PDF with progress tracking
 async function convertToPDF() {
     if (selectedFiles.length === 0) {
         showError('Please select at least one image');
@@ -363,15 +424,20 @@ async function convertToPDF() {
     hideMessages();
     isConverting = true;
     convertBtn.disabled = true;
-    loadingSpinner.style.display = 'block';
-    loadingText.style.display = 'block';
+    
+    // Show progress bar
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressText.textContent = 'Preparing upload...';
 
     try {
         // Create FormData
         const formData = new FormData();
         selectedFiles.forEach((file, index) => {
             formData.append('images', file);
-            // Send rotation data for each image
             formData.append(`rotation_${index}`, rotations[index] || 0);
         });
 
@@ -380,90 +446,118 @@ async function convertToPDF() {
             orientation: selectedOptions.orientation,
             size: selectedOptions.size,
             margin: selectedOptions.margin,
-            quality: selectedOptions.quality  // NEW: Include quality setting
+            quality: selectedOptions.quality
         });
 
-        // Send to backend with query parameters
-        const response = await fetch(`/convert?${queryParams.toString()}`, {
-            method: 'POST',
-            body: formData,
-            timeout: 120000 // 2 minute timeout for large conversions
-        });
-
-        if (!response.ok) {
-            let errorMessage = 'Conversion failed';
-            const contentType = response.headers.get('content-type');
+        // Use XMLHttpRequest for progress tracking
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
             
-            if (contentType && contentType.includes('application/json')) {
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const uploadPercent = (e.loaded / e.total) * 60; // 0-60% for upload
+                    progressBar.style.width = uploadPercent + '%';
+                    progressText.textContent = `Uploading... ${Math.round(uploadPercent)}%`;
+                }
+            });
+            
+            // Track download (processing) progress
+            xhr.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const processPercent = 60 + (e.loaded / e.total) * 40; // 60-100% for processing
+                    progressBar.style.width = processPercent + '%';
+                    progressText.textContent = `Processing... ${Math.round(processPercent)}%`;
+                }
+            });
+            
+            // Handle completion
+            xhr.addEventListener('load', async () => {
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error || errorMessage;
-                } catch (e) {
-                    const text = await response.text();
-                    errorMessage = text.substring(0, 100) || errorMessage;
+                    if (xhr.status !== 200) {
+                        let errorMessage = 'Conversion failed';
+                        try {
+                            const json = JSON.parse(xhr.responseText);
+                            errorMessage = json.error || errorMessage;
+                        } catch {
+                            errorMessage = xhr.responseText.substring(0, 100);
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    progressBar.style.width = '100%';
+                    progressText.textContent = 'Finalizing... 100%';
+
+                    // Get PDF blob
+                    const blob = new Blob([xhr.response], { type: 'application/pdf' });
+                    
+                    if (blob.size === 0) {
+                        throw new Error('Generated PDF is empty');
+                    }
+
+                    // Extract filename from headers
+                    let outputFileName = 'converted.pdf';
+                    let originalSize = 0;
+                    let processedSize = 0;
+                    
+                    try {
+                        const contentDisposition = xhr.getResponseHeader('Content-Disposition');
+                        if (contentDisposition) {
+                            const match = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+                            if (match && match[1]) {
+                                outputFileName = decodeURIComponent(match[1]);
+                            }
+                        }
+                        
+                        originalSize = parseInt(xhr.getResponseHeader('X-Original-Size') || '0');
+                        processedSize = parseInt(xhr.getResponseHeader('X-Processed-Size') || '0');
+                    } catch (err) {
+                        console.warn('Could not extract headers:', err);
+                    }
+
+                    // Create download link
+                    const url = URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = outputFileName;
+
+                    // Display filename with compression stats
+                    const fileNameDisplay = document.getElementById('fileNameDisplay');
+                    let sizeInfo = '';
+                    if (originalSize > 0 && processedSize > 0) {
+                        const reduction = ((1 - processedSize / originalSize) * 100).toFixed(1);
+                        sizeInfo = `<br><span style="font-size: 0.9em; color: var(--text-secondary);">📦 ${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(processedSize / 1024 / 1024).toFixed(1)}MB (${reduction}% reduction)</span>`;
+                    }
+                    fileNameDisplay.innerHTML = `📄 <strong>File name:</strong> ${escapeHtml(outputFileName)}${sizeInfo}`;
+
+                    // Show download section
+                    downloadSection.style.display = 'block';
+                    showSuccess(`✓ Successfully converted ${selectedFiles.length} image(s) to PDF!`);
+                    
+                    // Hide action/progress section
+                    actionSection.style.display = 'none';
+                    progressContainer.style.display = 'none';
+                    
+                    console.log(`[SUCCESS] Converted ${selectedFiles.length} file(s) - ${outputFileName}`);
+                    resolve();
+                } catch (error) {
+                    reject(error);
                 }
-            } else {
-                const text = await response.text();
-                errorMessage = text.substring(0, 100) || errorMessage;
-            }
+            });
             
-            throw new Error(errorMessage);
-        }
-
-        // Get PDF blob
-        const blob = await response.blob();
-
-        // Validate blob size
-        if (blob.size === 0) {
-            throw new Error('Generated PDF is empty');
-        }
-
-        // Extract filename from backend response header (backend is source of truth)
-        let outputFileName = 'converted.pdf';
-        let originalSize = 0;
-        let processedSize = 0;
-        
-        try {
-            const contentDisposition = response.headers.get('Content-Disposition');
-            if (contentDisposition) {
-                // Extract filename from "attachment; filename*=UTF-8''..." format
-                const match = contentDisposition.match(/filename\*=UTF-8''(.+)/);
-                if (match && match[1]) {
-                    outputFileName = decodeURIComponent(match[1]);
-                }
-            }
+            // Handle errors
+            xhr.addEventListener('error', () => {
+                reject(new Error('Network error during upload'));
+            });
             
-            // Get compression stats from custom headers
-            originalSize = parseInt(response.headers.get('X-Original-Size') || '0');
-            processedSize = parseInt(response.headers.get('X-Processed-Size') || '0');
-        } catch (err) {
-            console.warn('Could not extract headers:', err);
-        }
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Upload cancelled'));
+            });
 
-        // Create download link
-        const url = URL.createObjectURL(blob);
-        downloadLink.href = url;
-        // Set the download filename attribute (ensures browser saves with correct name)
-        downloadLink.download = outputFileName;
-
-        // Display filename to user
-        const fileNameDisplay = document.getElementById('fileNameDisplay');
-        let sizeInfo = '';
-        if (originalSize > 0 && processedSize > 0) {
-            const reduction = ((1 - processedSize / originalSize) * 100).toFixed(1);
-            sizeInfo = `<br><span style="font-size: 0.9em; color: var(--text-secondary);">📦 ${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(processedSize / 1024 / 1024).toFixed(1)}MB (${reduction}% reduction)</span>`;
-        }
-        fileNameDisplay.innerHTML = `📄 <strong>File name:</strong> ${escapeHtml(outputFileName)}${sizeInfo}`;
-
-        // Show download section
-        downloadSection.style.display = 'block';
-        showSuccess(`✓ Successfully converted ${selectedFiles.length} image(s) to PDF!`);
-        
-        // Hide action section
-        actionSection.style.display = 'none';
-        
-        // Log success for debugging
-        console.log(`[SUCCESS] Converted ${selectedFiles.length} file(s) - ${outputFileName} | Compression: ${originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : 'N/A'}%`);
+            // Send request
+            xhr.open('POST', `/convert?${queryParams.toString()}`);
+            xhr.responseType = 'arraybuffer'; // Get binary data
+            xhr.send(formData);
+        });
 
     } catch (error) {
         console.error('Conversion error:', error);
@@ -471,8 +565,7 @@ async function convertToPDF() {
         convertBtn.disabled = false;
     } finally {
         isConverting = false;
-        loadingSpinner.style.display = 'none';
-        loadingText.style.display = 'none';
+        progressContainer.style.display = 'none';
     }
 }
 
@@ -520,8 +613,22 @@ function escapeHtml(unsafe) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Convertly app initialized');
-    updateActionButtons();
+    try {
+        console.log('Convertly app initializing...');
+        console.log('DOM Elements:', {
+            optionsSection: !!optionsSection,
+            actionSection: !!actionSection,
+            downloadSection: !!downloadSection,
+            convertBtn: !!convertBtn,
+            imagePreviewContainer: !!imagePreviewContainer,
+            progressContainer: !!progressContainer
+        });
+        updateActionButtons();
+        console.log('Convertly app initialized successfully');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        alert('Error initializing app: ' + error.message);
+    }
     
     // Log browser support
     if (!window.FileReader) {

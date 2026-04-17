@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
+const helmet = require('helmet');
 const { PDFDocument } = require('pdf-lib');
 const rateLimit = require('express-rate-limit');
 const { fileTypeFromBuffer } = require('file-type');
@@ -10,6 +11,9 @@ const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Security: Use Helmet to set various HTTP headers
+app.use(helmet());
 
 // Rate limiting middleware (stricter for heavy processing)
 const limiter = rateLimit({

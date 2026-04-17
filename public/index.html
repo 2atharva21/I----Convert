@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Convertly - JPG to PDF Converter</title>
     <link rel="stylesheet" href="style.css">
+    <!-- SortableJS for drag & reorder -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -119,6 +121,15 @@
             <!-- Convert and Download Section -->
             <div id="actionSection" class="action-section" style="display: none;">
                 <button id="convertBtn" class="btn btn-success" disabled>🔄 Convert to PDF</button>
+                
+                <!-- Progress Bar (NEW) -->
+                <div id="progressContainer" class="progress-container" style="display: none; margin-top: 20px;">
+                    <div class="progress-bar-bg">
+                        <div id="progressBar" class="progress-bar-fill"></div>
+                    </div>
+                    <p id="progressText" class="progress-text">Preparing...</p>
+                </div>
+                
                 <div id="loadingSpinner" class="spinner" style="display: none;"></div>
                 <p id="loadingText" class="loading-text" style="display: none;">Converting your images...</p>
             </div>
