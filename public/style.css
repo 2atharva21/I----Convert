@@ -366,6 +366,13 @@ body {
     margin-bottom: 10px;
 }
 
+.option-hint {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin: -8px 0 12px 0;
+    font-style: italic;
+}
+
 /* Button Group */
 .button-group {
     display: grid;
@@ -603,4 +610,38 @@ body {
 
 input[type="file"]:focus {
     outline: none;
+}
+
+/* Enhanced button styling for better text wrapping */
+.btn-success {
+    line-height: 1.5;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.btn-success:disabled {
+    opacity: 0.65;
+}
+
+/* Improve message styling */
+.error-message::before,
+.success-message::before {
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+/* Better preview grid */
+@media (max-width: 768px) {
+    .image-preview-container {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    }
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+button, a, input, select {
+    transition: all 0.3s ease;
 }

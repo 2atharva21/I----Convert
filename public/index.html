@@ -28,7 +28,7 @@
                         accept=".jpg,.jpeg,image/jpeg,image/jpg"
                         style="display: none;"
                     >
-                    <p class="file-info">Select one file at a time. Add more by clicking again. Max 10MB per file.</p>
+                    <p class="file-info">Select one file at a time. Add more by clicking again. Max 25MB per file (up to 100MB total).</p>
                 </div>
             </div>
 
@@ -91,6 +91,26 @@
                         <button class="option-btn margin-btn" data-value="20">
                             <span class="btn-icon">⊟</span>
                             Medium
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Image Quality (NEW) -->
+                <div class="option-group">
+                    <label class="option-label">🎨 Image Quality</label>
+                    <p class="option-hint">Higher quality = larger file size. Lower quality = faster conversion.</p>
+                    <div class="button-group">
+                        <button class="option-btn quality-btn" data-value="60">
+                            <span class="btn-icon">🗜️</span>
+                            Low (60)
+                        </button>
+                        <button class="option-btn quality-btn active" data-value="80">
+                            <span class="btn-icon">⚖️</span>
+                            Balanced (80)
+                        </button>
+                        <button class="option-btn quality-btn" data-value="95">
+                            <span class="btn-icon">✨</span>
+                            High (95)
                         </button>
                     </div>
                 </div>

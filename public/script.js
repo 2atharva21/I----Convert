@@ -19,13 +19,20 @@ const loadingText = document.getElementById('loadingText');
 let selectedFiles = [];
 let rotations = []; // Track rotation for each image (in degrees)
 let isFilePickerOpen = false;
+let isConverting = false;
 
 // PDF Options State
 let selectedOptions = {
     orientation: 'portrait',
     size: 'A4',
-    margin: 0
+    margin: 0,
+    quality: 80  // NEW: Default to balanced quality
 };
+
+// Option display labels
+const orientationLabels = { portrait: 'Portrait', landscape: 'Landscape' };
+const marginLabels = { 0: 'No Margin', 10: 'Small Margin', 20: 'Medium Margin' };
+const qualityLabels = { 60: 'Low Quality', 80: 'Balanced', 95: 'High Quality' };
 
 // Event Listeners
 fileInput.addEventListener('change', handleFileSelect);
@@ -53,6 +60,18 @@ convertBtn.addEventListener('click', convertToPDF);
 clearImagesBtn.addEventListener('click', clearAllImages);
 convertAnotherBtn.addEventListener('click', resetForm);
 
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    // Escape to hide error/success messages
+    if (e.key === 'Escape') {
+        hideMessages();
+    }
+    // Enter to convert when ready (if button is enabled)
+    if (e.key === 'Enter' && !convertBtn.disabled && !isConverting) {
+        convertToPDF();
+    }
+});
+
 // PDF Options Event Listeners
 // Orientation buttons
 document.querySelectorAll('.orientation-btn').forEach(btn => {
@@ -60,6 +79,7 @@ document.querySelectorAll('.orientation-btn').forEach(btn => {
         document.querySelectorAll('.orientation-btn').forEach(b => b.classList.remove('active'));
         e.target.closest('button').classList.add('active');
         selectedOptions.orientation = e.target.closest('button').dataset.value;
+        updateOptionsSummary();
     });
 });
 
@@ -68,6 +88,7 @@ const pageSizeSelect = document.getElementById('pageSizeSelect');
 if (pageSizeSelect) {
     pageSizeSelect.addEventListener('change', (e) => {
         selectedOptions.size = e.target.value;
+        updateOptionsSummary();
     });
 }
 
@@ -77,6 +98,17 @@ document.querySelectorAll('.margin-btn').forEach(btn => {
         document.querySelectorAll('.margin-btn').forEach(b => b.classList.remove('active'));
         e.target.closest('button').classList.add('active');
         selectedOptions.margin = parseInt(e.target.closest('button').dataset.value);
+        updateOptionsSummary();
+    });
+});
+
+// Quality buttons (NEW)
+document.querySelectorAll('.quality-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
+        e.target.closest('button').classList.add('active');
+        selectedOptions.quality = parseInt(e.target.closest('button').dataset.value);
+        updateOptionsSummary();
     });
 });
 
@@ -120,6 +152,13 @@ function handleFileDrop(e) {
     addFiles(files);
 }
 
+// Update options summary display
+function updateOptionsSummary() {
+    const summary = `${selectedOptions.size} • ${orientationLabels[selectedOptions.orientation]} • ${marginLabels[selectedOptions.margin]} • ${qualityLabels[selectedOptions.quality]}`;
+    const convertBtnText = convertBtn.textContent;
+    convertBtn.innerHTML = `🔄 Convert to PDF<br><span style="font-size: 0.85em; opacity: 0.8;">${summary}</span>`;
+}
+
 // Add files to selection
 function addFiles(files) {
     hideMessages();
@@ -130,6 +169,7 @@ function addFiles(files) {
     }
 
     const validFiles = [];
+    const largeFiles = [];
     
     files.forEach(file => {
         // Check file type
@@ -140,8 +180,13 @@ function addFiles(files) {
 
         // Check file size
         if (!isValidFileSize(file)) {
-            showError(`"${file.name}" exceeds the 10MB file size limit.`);
+            showError(`"${file.name}" exceeds the 25MB file size limit.`);
             return;
+        }
+
+        // Track large files for warning
+        if (file.size > 15 * 1024 * 1024) {
+            largeFiles.push(file);
         }
 
         validFiles.push(file);
@@ -153,6 +198,11 @@ function addFiles(files) {
         validFiles.forEach(() => rotations.push(0));
         updatePreview();
         updateActionButtons();
+        
+        // Show warning for large images
+        if (largeFiles.length > 0) {
+            showError(`⚠️ Large image(s) detected (${largeFiles.length}). They will be optimized automatically for faster conversion.`);
+        }
     }
 }
 
@@ -168,7 +218,7 @@ function isValidFileType(file) {
 
 // Validate file size
 function isValidFileSize(file) {
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 25 * 1024 * 1024; // 25MB (supports large phone photos)
     return file.size <= maxSize;
 }
 
@@ -264,6 +314,7 @@ function updateActionButtons() {
         optionsSection.style.display = 'block';
         actionSection.style.display = 'block';
         convertBtn.disabled = false;
+        updateOptionsSummary(); // Update summary when showing options
     } else {
         optionsSection.style.display = 'none';
         actionSection.style.display = 'none';
@@ -279,7 +330,13 @@ async function convertToPDF() {
         return;
     }
 
+    // Prevent duplicate conversions
+    if (isConverting) {
+        return;
+    }
+
     hideMessages();
+    isConverting = true;
     convertBtn.disabled = true;
     loadingSpinner.style.display = 'block';
     loadingText.style.display = 'block';
@@ -297,13 +354,15 @@ async function convertToPDF() {
         const queryParams = new URLSearchParams({
             orientation: selectedOptions.orientation,
             size: selectedOptions.size,
-            margin: selectedOptions.margin
+            margin: selectedOptions.margin,
+            quality: selectedOptions.quality  // NEW: Include quality setting
         });
 
         // Send to backend with query parameters
         const response = await fetch(`/convert?${queryParams.toString()}`, {
             method: 'POST',
-            body: formData
+            body: formData,
+            timeout: 120000 // 2 minute timeout for large conversions
         });
 
         if (!response.ok) {
@@ -328,6 +387,11 @@ async function convertToPDF() {
 
         // Get PDF blob
         const blob = await response.blob();
+
+        // Validate blob size
+        if (blob.size === 0) {
+            throw new Error('Generated PDF is empty');
+        }
 
         // Extract filename from backend response header (backend is source of truth)
         let outputFileName = 'converted.pdf';
@@ -356,16 +420,20 @@ async function convertToPDF() {
 
         // Show download section
         downloadSection.style.display = 'block';
-        showSuccess(`Successfully converted ${selectedFiles.length} image(s) to PDF!`);
+        showSuccess(`✓ Successfully converted ${selectedFiles.length} image(s) to PDF!`);
         
         // Hide action section
         actionSection.style.display = 'none';
+        
+        // Log success for debugging
+        console.log(`[SUCCESS] Converted ${selectedFiles.length} file(s) - ${outputFileName}`);
 
     } catch (error) {
         console.error('Conversion error:', error);
-        showError('Error converting images: ' + error.message);
+        showError('❌ Error: ' + error.message);
         convertBtn.disabled = false;
     } finally {
+        isConverting = false;
         loadingSpinner.style.display = 'none';
         loadingText.style.display = 'none';
     }
@@ -374,11 +442,16 @@ async function convertToPDF() {
 // Reset form
 function resetForm() {
     selectedFiles = [];
+    rotations = [];
     fileInput.value = '';
     updatePreview();
     updateActionButtons();
     downloadSection.style.display = 'none';
+    actionSection.style.display = 'none';
     hideMessages();
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // Show error message
@@ -414,4 +487,9 @@ function escapeHtml(unsafe) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Convertly app initialized');
     updateActionButtons();
+    
+    // Log browser support
+    if (!window.FileReader) {
+        showError('⚠️ Your browser does not support file reading. Please use a modern browser.');
+    }
 });

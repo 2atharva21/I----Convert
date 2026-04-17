@@ -53,7 +53,7 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB per file
+    fileSize: 25 * 1024 * 1024 // 25MB per file (supports large phone photos)
   }
 });
 
@@ -118,9 +118,9 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
       return res.status(400).json({ error: `Invalid margin. Must be: ${validMargins.join(', ')}` });
     }
 
-    // Check total upload size limit (50MB max)
+    // Check total upload size limit (100MB max for multiple high-res images)
     const totalSize = req.files.reduce((sum, file) => sum + file.size, 0);
-    const maxTotalSize = 50 * 1024 * 1024; // 50MB
+    const maxTotalSize = 100 * 1024 * 1024; // 100MB
     
     if (totalSize > maxTotalSize) {
       throw new Error(`Total file size (${(totalSize / 1024 / 1024).toFixed(2)}MB) exceeds 50MB limit`);
@@ -152,17 +152,33 @@ app.post('/convert', upload.array('images', 20), async (req, res) => {
         // Get rotation value from request (in degrees: 0, 90, 180, 270, etc.)
         const rotation = parseInt(req.body[`rotation_${fileIndex}`]) || 0;
         
-        // Apply rotation using sharp if rotation is not 0
+        // Get quality from query params (default 80 for optimal compression)
+        const quality = Math.min(Math.max(parseInt(req.query.quality) || 80, 60), 95); // Clamp: 60-95
+        
+        // Process image: rotate, resize, and compress
+        // This handles large phone photos (4000x3000, 5MB-25MB) efficiently
+        let sharpPipeline = sharp(imageData);
+        
+        // Apply rotation if needed
         if (rotation !== 0) {
-          // Normalize rotation to 0, 90, 180, 270
           const normalizedRotation = ((rotation % 360) + 360) % 360;
           if (normalizedRotation !== 0) {
-            imageData = await sharp(imageData)
-              .rotate(normalizedRotation)
-              .jpeg({ quality: 90 })
-              .toBuffer();
+            sharpPipeline = sharpPipeline.rotate(normalizedRotation);
           }
         }
+        
+        // Resize large images (max 1920px width) and compress intelligently
+        imageData = await sharpPipeline
+          .resize({
+            width: 1920,        // Limit max width to 1920px
+            withoutEnlargement: true // Don't upscale small images
+          })
+          .jpeg({
+            quality: quality,   // User-controlled quality (60-95)
+            mozjpeg: true,      // Use MozJPEG for better compression
+            progressive: true   // Progressive JPEG for faster loading
+          })
+          .toBuffer();
         
         // Embed image in PDF
         const image = await pdfDoc.embedJpg(imageData);
