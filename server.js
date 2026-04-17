@@ -296,8 +296,13 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log('Upload folder: ' + path.join(__dirname, 'uploads'));
-});
+// Export app for Vercel serverless functions
+module.exports = app;
+
+// Start server locally (not in serverless/production)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log('Upload folder: ' + path.join(__dirname, 'uploads'));
+  });
+}
